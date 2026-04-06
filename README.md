@@ -10,10 +10,11 @@ I have implemented a total of **6 synchronization primitives**, namely: TAS Lock
 ### Description of Algorithms
 
 #### 1. TAS Lock
-The Test-and-Set (TAS) lock uses `std::atomic<bool>` with the `exchange` operation to atomically attempt to set the lock flag to `true`. If the exchange returns `true`, the lock is already held, and the thread spins — calling `PAUSE()` to hint to the CPU that it is in a spin-wait loop and reduce power draw and contention. Once the exchange succeeds (returns `false`), the thread has acquired the lock. Releasing simply stores `false` with release semantics. Since the thread that just released the lock is likely to still have the cache line warm, TAS behaves like a **LIFO** lock in practice, meaning it can cause starvation under high contention. It exports `lock()` and `unlock()`.
+The Test-and-Set (TAS) lock uses `std::atomic<bool>` with the `exchange` operation to atomically attempt to set the lock flag to `true`. If the exchange returns `true`, the lock is already held, and the thread spins — calling `PAUSE()` to hint to the CPU that it is in a spin-wait loop and reduce power draw and contention. Once the exchange succeeds (returns `false`), the thread has acquired the lock. Releasing simply stores `false` with release semantics. 
+
 
 #### 2. TTAS Lock
-The Test-and-Test-and-Set (TTAS) lock improves on TAS by first reading the flag with relaxed semantics before attempting the CAS. A thread only calls `compare_exchange_weak` once it observes the lock as free. This avoids repeatedly issuing write operations to the cache line while the lock is held by another thread, which would otherwise cause cache-line invalidation storms across cores. Like TAS, it is essentially **LIFO** and unfair. It exports `lock()` and `unlock()`.
+The Test-and-Test-and-Set (TTAS) lock improves on TAS by first reading the flag with relaxed semantics before attempting the CAS. A thread only calls `compare_exchange_weak` once it observes the lock as free. This avoids repeatedly issuing write operations to the cache line while the lock is held by another thread, which would otherwise cause cache-line invalidation storms across cores.
 
 #### 3. Ticket Lock
 The Ticket Lock uses two atomic integers: `now_serving` and `next_num`. Each arriving thread atomically increments `next_num` to claim its ticket, then spins until `now_serving` matches its ticket. When done, a thread increments `now_serving` so the next thread in line may proceed. This guarantees **strict FIFO** ordering — every thread is served in the order it arrived — making the Ticket Lock a fair algorithm. It exports `lock()` and `unlock()`.
